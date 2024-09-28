@@ -36,6 +36,7 @@ class TokenType(Enum):
     Class = "Class"
     If = "If"
     For = "For"
+    While = "While"
     Return = "Return"
     Colon = "Colon"
     Semicolon = "Semicolon"
@@ -156,6 +157,21 @@ class Lexer:
             case ' ':
                 self.advance()
                 return self.next()
+            case a if a.isalpha():
+                identifier = self.an_identifier()
+                match identifier:
+                    case "and": return Token(TokenType.And, identifier)
+                    case "or": return Token(TokenType.Or, identifier)
+                    case "if": return Token(TokenType.If, identifier)
+                    case "var": return Token(TokenType.Var, identifier)
+                    case "const": return Token(TokenType.Const, identifier)
+                    case "function": return Token(TokenType.Function, identifier)
+                    case "class": return Token(TokenType.Class, identifier)
+                    case "for": return Token(TokenType.For, identifier)
+                    case "while": return Token(TokenType.While, identifier)
+                    case "return": return Token(TokenType.Return, identifier)
+                    case _:
+                        return Token(TokenType.Identifier, identifier)
             case _:
                 illegal = self.curr()
                 self.advance()
@@ -193,3 +209,15 @@ class Lexer:
             self.advance()
 
         return result, is_float
+
+    def an_identifier(self) -> str:
+        result = ""
+
+        while not self.is_at_end():
+            if not self.curr().isalnum():
+                break
+
+            result += self.curr()
+            self.advance()
+
+        return result
