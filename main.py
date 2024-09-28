@@ -1,4 +1,5 @@
-import lexer
+from lexer import Lexer
+from parser import Parser, UnexpectedToken
 import sys
 
 VERSION = "0.1.0"
@@ -11,12 +12,16 @@ def repl() -> None:
         line = input("> ").strip("\n")
         if line == ".exit":
             break
-        lex = lexer.Lexer(line)
-        token = lex.next()
+        lexer = Lexer(line)
+        parser = Parser(lexer)
 
-        while token.type != lexer.TokenType.Eof:
-            print(token)
-            token = lex.next()
+        try:
+            result = parser.parse()
+            for tree in result:
+                print(tree)
+        except UnexpectedToken as error:
+            print(error)
+            continue
 
 
 def main() -> None:
