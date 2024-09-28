@@ -49,8 +49,35 @@ class BinaryExpr:
         return f"BinaryExpr(lhs: {self.lhs}, op: {self.op}, rhs: {self.rhs})"
 
 
+class BlockExpr:
+    def __init__(self, exprs: List[Expression]) -> None:
+        self.exprs = exprs
+
+    def __str__(self) -> str:
+        exprs = [str(expr) for expr in self.exprs]
+        return f"BlockExpr(exprs: {exprs})"
+
+
+class VarExpr:
+    def __init__(self, lhs: Expression, rhs: Expression) -> None:
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def __str__(self) -> str:
+        return f"VarExpr(lhs: {self.lhs}, rhs: {self.rhs})"
+
+
+class ConstExpr:
+    def __init__(self, lhs: Expression, rhs: Expression) -> None:
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def __str__(self) -> str:
+        return f"ConstExpr(lhs: {self.lhs}, rhs: {self.rhs})"
+
+
 PrimaryExpr = IntExpr | StringExpr | FloatExpr | IdentifierExpr
-Expression = PrimaryExpr | BinaryExpr
+Expression = PrimaryExpr | BinaryExpr | BlockExpr | VarExpr | ConstExpr
 
 
 class Parser:
@@ -73,6 +100,9 @@ class Parser:
                 self.advance()
                 return True
         return False
+
+    def peek(self, type: TokenType) -> bool:
+        return self.curr_token.type == type
 
     def parse(self) -> List[Expression]:
         if self.is_at_end():
@@ -112,8 +142,53 @@ class Parser:
         if self.match(TokenType.Identifier):
             return IdentifierExpr(self.prev_token.lexeme)
 
+        return self.parse_var()
+
+    def parse_var(self) -> Expression:
+        if self.match(TokenType.Var):
+            lhs = self.parse_expr()
+            if not type(lhs) is IdentifierExpr:
+                return self.unexpected_token("identifier")
+            if not self.match(TokenType.Equal):
+                return self.unexpected_token("=")
+            rhs = self.parse_expr()
+            if not self.match(TokenType.Semicolon):
+                return self.unexpected_token(";")
+
+            return VarExpr(lhs, rhs)
+
+        return self.parse_const()
+
+    def parse_const(self) -> Expression:
+        if self.match(TokenType.Const):
+            lhs = self.parse_expr()
+            if not type(lhs) is IdentifierExpr:
+                return self.unexpected_token("identifier")
+            if not self.match(TokenType.Equal):
+                return self.unexpected_token("=")
+            rhs = self.parse_expr()
+            if not self.match(TokenType.Semicolon):
+                return self.unexpected_token(";")
+
+            return ConstExpr(lhs, rhs)
+
+        return self.parse_block()
+
+    def parse_block(self) -> Expression:
+        if self.match(TokenType.LeftBracket):
+            exprs = []
+            while not self.is_at_end():
+                if self.peek(TokenType.RightBracket):
+                    break
+                exprs.append(self.parse_expr())
+
+            if not self.match(TokenType.RightBracket):
+                return self.unexpected_token("}")
+
+            return BlockExpr(exprs)
+
         return self.unexpected_token()
 
-    def unexpected_token(self):
+    def unexpected_token(self, token_str="primary expression"):
         raise UnexpectedToken(f"""{self.lexer.row}:{
-                              self.lexer.col} -> Expected primary instead got '{self.curr_token.lexeme}'""")
+                              self.lexer.col} -> Expected '{token_str}' instead got '{self.curr_token.lexeme}'""")
