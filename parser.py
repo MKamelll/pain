@@ -1,4 +1,5 @@
 from __future__ import annotations
+from enum import Enum
 from typing import List
 from lexer import Lexer, TokenType
 
@@ -76,8 +77,60 @@ class ConstExpr:
         return f"ConstExpr(lhs: {self.lhs}, rhs: {self.rhs})"
 
 
+class FunctionExpr:
+    def __init__(self, identifier: Expression, params: List[Expression], body: Expression) -> None:
+        self.identifier = identifier
+        self.params = params
+        self.body = body
+
+    def __str__(self) -> str:
+        params = [str(param) for param in self.params]
+        return f"FunctionExpr(identifier: {self.identifier}, params: {params}, body: {self.body})"
+
+
+class ReturnExpr:
+    def __init__(self, expr: Expression) -> None:
+        self.expr = expr
+
+    def __str__(self) -> str:
+        return f"ReturnExpr(expr: {self.expr})"
+
+
+class Associativity(Enum):
+    Left = "Left"
+    Right = "Right"
+
+
+class Operator:
+    def __init__(self, op: str, precedence: int, associativity: Associativity) -> None:
+        self.op = op
+        self.precedence = precedence
+        self.associativity = associativity
+
+    def __str__(self) -> str:
+        return f"Operator(op: {self.op}, precedence: {self.precedence}, associativity: {self.associativity})"
+
+
+ALLOWED_OPS = {
+    "or":  Operator("or", 0, Associativity.Left),
+    "and": Operator("and", 0, Associativity.Left),
+    "not": Operator("not", 0, Associativity.Left),
+
+    "==":  Operator("==", 0, Associativity.Left),
+    "<":   Operator("<", 1, Associativity.Left),
+    "<=":  Operator("<=", 1, Associativity.Left),
+    ">":   Operator(">", 1, Associativity.Left),
+    ">=":  Operator(">", 1, Associativity.Left),
+
+    "+":   Operator("+", 6, Associativity.Left),
+    "-":   Operator("-", 6, Associativity.Left),
+    "*":   Operator("*", 7, Associativity.Left),
+    "/":   Operator("/", 7, Associativity.Left),
+    "^":   Operator("^", 8, Associativity.Right),
+}
+
 PrimaryExpr = IntExpr | StringExpr | FloatExpr | IdentifierExpr
-Expression = PrimaryExpr | BinaryExpr | BlockExpr | VarExpr | ConstExpr
+Expression = PrimaryExpr | BinaryExpr | BlockExpr | VarExpr | ConstExpr | FunctionExpr | ReturnExpr
 
 
 class Parser:
@@ -113,8 +166,26 @@ class Parser:
 
         return self.parse()
 
-    def parse_expr(self) -> Expression:
+    def parse_expr(self, min_precedence=0) -> Expression:
         lhs = self.parse_primary()
+
+        while not self.is_at_end():
+            op = self.curr_token.lexeme
+            op_is_allowed = op in ALLOWED_OPS
+
+            if not op_is_allowed or ALLOWED_OPS[op].precedence < min_precedence:
+                break
+
+            curr_op = ALLOWED_OPS[op]
+            next_min_precedence = curr_op.precedence
+
+            if curr_op.associativity == Associativity.Right:
+                next_min_precedence += 1
+
+            self.advance()
+            rhs = self.parse_expr(next_min_precedence)
+            lhs = BinaryExpr(lhs, op, rhs)
+
         return lhs
 
     def parse_primary(self) -> Expression:
@@ -186,6 +257,44 @@ class Parser:
                 return self.unexpected_token("}")
 
             return BlockExpr(exprs)
+
+        return self.parse_function_expr()
+
+    def parse_function_expr(self) -> Expression:
+        if self.match(TokenType.Function):
+            if not self.match(TokenType.Identifier):
+                return self.unexpected_token("identifier")
+            identifier = IdentifierExpr(self.prev_token.lexeme)
+
+            if not self.match(TokenType.LeftParen):
+                return self.unexpected_token("(")
+
+            params = []
+            while not self.is_at_end():
+                if self.match(TokenType.Comma):
+                    continue
+
+                if self.peek(TokenType.RightParen):
+                    break
+                expr = self.parse_expr()
+                params.append(expr)
+
+            if not self.match(TokenType.RightParen):
+                return self.unexpected_token(")")
+
+            block = self.parse_block()
+
+            return FunctionExpr(identifier, params, block)
+
+        return self.parse_return_expr()
+
+    def parse_return_expr(self) -> Expression:
+        if self.match(TokenType.Return):
+            expr = self.parse_expr()
+
+            if not self.match(TokenType.Semicolon):
+                return self.unexpected_token(";")
+            return ReturnExpr(expr)
 
         return self.unexpected_token()
 

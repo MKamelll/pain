@@ -17,6 +17,8 @@ class TokenType(Enum):
     StarEqual = "StarEqual"
     Slash = "Slash"
     SlashEqual = "SlashEqual"
+    Carrot = "Carrot"
+    CarrotEqual = "CarrotEqual"
     Equal = "Equal"
     EqualEqual = "EqualEqual"
     GreaterThan = "GreaterThan"
@@ -40,6 +42,7 @@ class TokenType(Enum):
     Return = "Return"
     Colon = "Colon"
     Semicolon = "Semicolon"
+    Comma = "Comma"
     Illegal = "Illegal"
     Eof = "Eof"
 
@@ -135,6 +138,12 @@ class Lexer:
                     self.advance()
                     return Token(TokenType.SlashEqual, "/=")
                 return Token(TokenType.Slash, "/")
+            case '^':
+                self.advance()
+                if self.curr() == '=':
+                    self.advance()
+                    return Token(TokenType.CarrotEqual, "^=")
+                return Token(TokenType.Carrot, "^")
             case '"':
                 result = self.a_string()
                 return Token(TokenType.String, result)
@@ -154,6 +163,9 @@ class Lexer:
                 self.col = 0
                 self.row += 1
                 return self.next()
+            case ',':
+                self.advance()
+                return Token(TokenType.Comma, ",")
             case ' ':
                 self.advance()
                 return self.next()
