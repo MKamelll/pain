@@ -33,11 +33,12 @@ class FloatExpr:
 
 
 class IdentifierExpr:
-    def __init__(self, val: str) -> None:
+    def __init__(self, val: str, type: str | None = None) -> None:
         self.val = val
+        self.type = type
 
     def __str__(self) -> str:
-        return f"IdentifierExpr(val: '{self.val}')"
+        return f"IdentifierExpr(val: '{self.val}', type: {self.type})"
 
 
 class BinaryExpr:
@@ -211,6 +212,12 @@ class Parser:
 
     def parse_identifier(self) -> Expression:
         if self.match(TokenType.Identifier):
+            if self.match(TokenType.Colon):
+                identifier = self.prev_token.lexeme
+                if not self.match(TokenType.Identifier):
+                    return self.unexpected_token("type")
+                type = self.prev_token.lexeme
+                return IdentifierExpr(identifier, type)
             return IdentifierExpr(self.prev_token.lexeme)
 
         return self.parse_var()
